@@ -71,6 +71,9 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
         //If input matches an item of the list exactly, select it automatically
         var selectOnExact = attrs.typeaheadSelectOnExact ? originalScope.$eval(attrs.typeaheadSelectOnExact) : false;
 
+        // if PopupHeight is specified, popup will be set maxHeight and overflow:hidden
+        var popupMaxHeight = parseInt(attrs.typeaheadPopupHeight, 10) || 0;
+
         //INTERNAL VARIABLES
 
         //model setter executed upon match selection
@@ -110,7 +113,8 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
           select: 'select(activeIdx)',
           'move-in-progress': 'moveInProgress',
           query: 'query',
-          position: 'position'
+          position: 'position',
+          'max-height': popupMaxHeight
         });
         //custom item template
         if (angular.isDefined(attrs.typeaheadTemplateUrl)) {
@@ -141,7 +145,6 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
           if (scope.matches.length > index && inputValue) {
             return inputValue.toUpperCase() === scope.matches[index].label.toUpperCase();
           }
-
           return false;
         };
 
@@ -176,6 +179,8 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
                 //due to other elements being rendered
                 recalculatePosition();
 
+                ensureHighlightVisible();
+                
                 element.attr('aria-expanded', true);
 
                 //Select the single remaining option if user input matches
@@ -363,10 +368,12 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
           if (evt.which === 40) {
             scope.activeIdx = (scope.activeIdx + 1) % scope.matches.length;
             scope.$digest();
+            ensureHighlightVisible();
 
           } else if (evt.which === 38) {
             scope.activeIdx = (scope.activeIdx > 0 ? scope.activeIdx : scope.matches.length) - 1;
             scope.$digest();
+            ensureHighlightVisible();
 
           } else if (evt.which === 13 || evt.which === 9) {
             scope.$apply(function () {
@@ -422,6 +429,37 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
         } else {
           element.after($popup);
         }
+
+        function ensureHighlightVisible() {
+          if (popupMaxHeight === 0) {
+            return;
+          }
+
+          var container = $('#' + popupId);
+          var choices = container.children();
+          if (choices.length < 1) {
+            return;
+          }
+
+          if (scope.activeIdx < 0) {
+            return;
+          }
+
+          var highlighted = choices[scope.activeIdx];
+          var posY = highlighted.offsetTop + highlighted.clientHeight - container[0].scrollTop;
+          var height = container[0].offsetHeight;
+
+          if (posY > height) {
+            container[0].scrollTop += posY - height;
+          } else if (posY < highlighted.clientHeight) {
+            if (scope.activeIdx === 0) {
+              container[0].scrollTop = 0;
+            } else {
+              container[0].scrollTop -= highlighted.clientHeight - posY;
+            }
+          }
+        }
+
       }
     };
 
@@ -436,7 +474,8 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
         active: '=',
         position: '&',
         moveInProgress: '=',
-        select: '&'
+        select: '&',
+        maxHeight:'='
       },
       replace: true,
       templateUrl: 'template/typeahead/typeahead-popup.html',
@@ -458,6 +497,12 @@ angular.module('ui.bootstrap.typeahead', ['ui.bootstrap.position'])
         scope.selectMatch = function(activeIdx) {
           scope.select({activeIdx:activeIdx});
         };
+
+        if (scope.maxHeight) {
+          element.css({height: 'auto'});
+          element.css({maxHeight: scope.maxHeight + 'px'});
+          element.css({overflowX: 'hidden'});
+        }
       }
     };
   })
